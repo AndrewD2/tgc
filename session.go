@@ -1,4 +1,4 @@
-package session
+package tgc
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 
 const baseURL = "https://www.thegamecrafter.com/api/session"
 
-type TGCSession struct {
+type Session struct {
 	Result struct {
 		ID string `json:"id"`
 		//WingObjectType string `json:"wing_object_type"`
@@ -19,12 +19,22 @@ type TGCSession struct {
 	} `json:"result"`
 }
 
-func (s *TGCSession) Create(username string, password string, api_key_id string) {
+func (s *Session) Create(username string, password string, api_key_id string) error {
 
-	v := url.Values{"username": {username}, "password":{password}, "api_key_id":{api_key_id}}
+	v := url.Values{"username": {username}, "password": {password}, "api_key_id": {api_key_id}}
 	resp, err := http.PostForm(baseURL, v)
 	if err != nil {
 		log.Println(err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		var e Error
+		if err := json.NewDecoder(resp.Body).Decode(&e); err != nil {
+			log.Println(err)
+		}
+
+		err := fmt.Errorf("TGC Session: %d - %s", e.Error.Code, e.Error.Message)
+		return err
 	}
 
 	defer resp.Body.Close()
@@ -32,19 +42,20 @@ func (s *TGCSession) Create(username string, password string, api_key_id string)
 	if err := json.NewDecoder(resp.Body).Decode(&s); err != nil {
 		log.Println(err)
 	}
+
+	return nil
 }
 
-func (s *TGCSession) Delete() {
-	r, err := http.NewRequest(http.MethodDelete, baseURL+s.Result.ID, nil)
+func (s *Session) Delete() {
+	_, err := http.NewRequest(http.MethodDelete, baseURL+s.Result.ID, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
-	fmt.Println(r)
 	*s = s.Details()
 }
 
-func (s *TGCSession) Details() TGCSession {
+func (s *Session) Details() (d Session) {
 	resp, err := http.Get(baseURL + s.Result.ID)
 	if err != nil {
 		log.Println(err)
@@ -52,12 +63,10 @@ func (s *TGCSession) Details() TGCSession {
 
 	defer resp.Body.Close()
 
-	var d TGCSession
-
 	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil {
 		log.Println(err)
 	}
 
-	return d
+	return
 
 }
